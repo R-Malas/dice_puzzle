@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:dice/layout_utils/show_message.dart';
+import 'package:dice/models/message_type-enum.dart';
 import 'package:dice/widgets/dice.dart';
 import 'package:flutter/material.dart';
 
@@ -17,6 +19,7 @@ class _DiceScreenState extends State<DiceScreen> {
 
   // input field properties
   bool _hasInputValue = false;
+  bool _isCheatModelEnabled = false;
   final _focusNode = FocusNode();
   final TextEditingController _txtCtrl = TextEditingController();
 
@@ -31,6 +34,9 @@ class _DiceScreenState extends State<DiceScreen> {
         backgroundColor: Theme.of(context).backgroundColor,
         centerTitle: true,
         elevation: 0.0,
+        actions: [
+          Switch(value: _isCheatModelEnabled, onChanged: _enableCheatMode)
+        ],
       ),
       body: Center(
         child: Column(
@@ -106,29 +112,15 @@ class _DiceScreenState extends State<DiceScreen> {
     _txtCtrl.clear();
     final parsedGuess = int.tryParse(guess);
     if (parsedGuess == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('You can only enter numbers'),
-        backgroundColor: Theme.of(context).hintColor,
-      ));
+      showMessage(
+          'You can only enter numbers', MessageTypeEnum.success, context);
     } else if (parsedGuess < 2 || parsedGuess > 12) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              const Text('Your guess must be less than 12 and bigger than 2'),
-          backgroundColor: Theme.of(context).errorColor));
+      showMessage('Your guess must be less than 12 and bigger than 2',
+          MessageTypeEnum.error, context);
     } else {
-      _onDiceTab();
-      if (parsedGuess == _firstDice + _secondDice) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('Good guess!'),
-            duration: const Duration(seconds: 1000),
-            backgroundColor: Theme.of(context).primaryColor));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Wrong guess, Try again!'),
-          duration: const Duration(seconds: 1000),
-          backgroundColor: Theme.of(context).errorColor,
-        ));
-      }
+      _isCheatModelEnabled
+          ? _roleWithCheatMode(parsedGuess)
+          : _roleDice(parsedGuess);
     }
 
     setState(() {
@@ -136,5 +128,50 @@ class _DiceScreenState extends State<DiceScreen> {
     });
 
     _focusNode.requestFocus();
+  }
+
+  void _roleDice(int userGuess) {
+    _onDiceTab();
+    if (userGuess == _firstDice + _secondDice) {
+      showMessage('Good Guess!', MessageTypeEnum.success, context);
+    } else {
+      showMessage('Wrong guess, Try again!', MessageTypeEnum.error, context);
+    }
+  }
+
+  void _roleWithCheatMode(int userGuess) {
+    var randomSeed = 0;
+    if (userGuess == 2) {
+      randomSeed = 1;
+    } else if (userGuess <= 6) {
+      randomSeed = userGuess;
+    } else {
+      randomSeed = userGuess ~/ 2;
+    }
+
+    var firstValue = Random().nextInt(randomSeed) + 1;
+    var secondValue = userGuess - firstValue;
+    bool isPairFound = firstValue <= 6 && secondValue <= 6;
+
+    while (!isPairFound) {
+      if (secondValue > 6) {
+        firstValue = Random().nextInt(randomSeed) + 1;
+        secondValue = userGuess - firstValue;
+      }
+      var newPairSum = secondValue + firstValue;
+      isPairFound =
+          firstValue <= 6 && secondValue <= 6 && newPairSum == userGuess;
+    }
+
+    setState(() {
+      _firstDice = firstValue;
+      _secondDice = secondValue;
+    });
+  }
+
+  void _enableCheatMode(value) {
+    setState(() {
+      _isCheatModelEnabled = value;
+    });
   }
 }
